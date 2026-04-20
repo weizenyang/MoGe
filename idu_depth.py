@@ -26,14 +26,24 @@ class MoGeIDU:
         os.makedirs(save_path, exist_ok=True)
     
     def __del__(self):
-        if self.model is not None:
+        model = getattr(self, "model", None)
+        if model is not None:
             try:
-                self.model.to("cpu")  # Move to CPU before deleting
+                model.to("cpu")
+            except Exception:
+                pass
+            try:
                 del self.model
-            except Exception as e:
-                print(f"Error during model cleanup: {e}")
-
-        torch.cuda.empty_cache()
+            except Exception:
+                pass
+            self.model = None
+        # During interpreter shutdown, `torch` in this module may already be None (PEP 442).
+        t = globals().get("torch")
+        if t is not None and getattr(t, "cuda", None) is not None:
+            try:
+                t.cuda.empty_cache()
+            except Exception:
+                pass
 
     @torch.no_grad()
     def run(self, refined_imgs: List[PILImage], pbar=True) -> List[np.ndarray]:
